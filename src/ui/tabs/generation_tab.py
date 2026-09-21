@@ -73,7 +73,9 @@ class GenerationTab(BaseTab):
         self.table.setAlternatingRowColors(True)
         self.table.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectItems)
         self.table.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
-        self.table.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Interactive)
+        self.table.horizontalHeader().setSectionResizeMode(
+            QtWidgets.QHeaderView.Interactive
+        )
         self.table.itemChanged.connect(self._on_item_changed)
         self.main_layout.addWidget(self.table, 1)
 
@@ -137,7 +139,11 @@ class GenerationTab(BaseTab):
                 row = self.table.rowCount()
                 self.table.insertRow(row)
                 for column, value in enumerate(record[: self.table.columnCount()]):
-                    self.table.setItem(row, column, QtWidgets.QTableWidgetItem("" if value is None else str(value)))
+                    self.table.setItem(
+                        row,
+                        column,
+                        QtWidgets.QTableWidgetItem("" if value is None else str(value)),
+                    )
         finally:
             self.table.blockSignals(False)
         self.rows_label.setText(f"Rows: {self.table.rowCount()} / {self._target_rows}")
@@ -169,7 +175,10 @@ class GenerationTab(BaseTab):
         self._update_actions()
 
     @Slot(str)
-    def handle_generation_cancelled(self, message: str = "Generation cancelled") -> None:
+    def handle_generation_cancelled(
+        self,
+        message: str = "Generation cancelled",
+    ) -> None:
         self._running = False
         self._flush_timer.stop()
         self.state_label.setText("Cancelled")
@@ -179,15 +188,21 @@ class GenerationTab(BaseTab):
 
     def current_dataframe(self) -> pd.DataFrame:
         columns = [
-            self.table.horizontalHeaderItem(i).text() if self.table.horizontalHeaderItem(i) else f"column_{i + 1}"
+            self.table.horizontalHeaderItem(i).text()
+            if self.table.horizontalHeaderItem(i)
+            else f"column_{i + 1}"
             for i in range(self.table.columnCount())
         ]
         rows = []
         for row in range(self.table.rowCount()):
-            rows.append([
-                self.table.item(row, column).text() if self.table.item(row, column) else ""
-                for column in range(self.table.columnCount())
-            ])
+            rows.append(
+                [
+                    self.table.item(row, column).text()
+                    if self.table.item(row, column)
+                    else ""
+                    for column in range(self.table.columnCount())
+                ]
+            )
         return pd.DataFrame(rows, columns=columns)
 
     def _display_dataframe(self, dataframe: pd.DataFrame) -> None:
@@ -195,15 +210,23 @@ class GenerationTab(BaseTab):
         try:
             self.table.clear()
             self.table.setColumnCount(len(dataframe.columns))
-            self.table.setHorizontalHeaderLabels([str(column) for column in dataframe.columns])
+            self.table.setHorizontalHeaderLabels(
+                [str(column) for column in dataframe.columns]
+            )
             self.table.setRowCount(len(dataframe))
             for row in range(len(dataframe)):
                 for column in range(len(dataframe.columns)):
                     value = dataframe.iat[row, column]
-                    self.table.setItem(row, column, QtWidgets.QTableWidgetItem("" if pd.isna(value) else str(value)))
+                    self.table.setItem(
+                        row,
+                        column,
+                        QtWidgets.QTableWidgetItem("" if pd.isna(value) else str(value)),
+                    )
         finally:
             self.table.blockSignals(False)
-        self.rows_label.setText(f"Rows: {len(dataframe)} / {self._target_rows or len(dataframe)}")
+        self.rows_label.setText(
+            f"Rows: {len(dataframe)} / {self._target_rows or len(dataframe)}"
+        )
 
     def _set_columns(self, columns: List[str]) -> None:
         self.table.setColumnCount(len(columns))
@@ -230,6 +253,7 @@ class GenerationTab(BaseTab):
         self._history_index -= 1
         self._data = self._history[self._history_index].copy()
         self._display_dataframe(self._data)
+        self.data_modified.emit()
         self._update_actions()
 
     @Slot()
@@ -239,11 +263,14 @@ class GenerationTab(BaseTab):
         self._history_index += 1
         self._data = self._history[self._history_index].copy()
         self._display_dataframe(self._data)
+        self.data_modified.emit()
         self._update_actions()
 
     def _update_actions(self) -> None:
         self.undo_btn.setEnabled(not self._running and self._history_index > 0)
-        self.redo_btn.setEnabled(not self._running and self._history_index < len(self._history) - 1)
+        self.redo_btn.setEnabled(
+            not self._running and self._history_index < len(self._history) - 1
+        )
 
     @Slot()
     def _export_dialog(self) -> None:
@@ -251,7 +278,10 @@ class GenerationTab(BaseTab):
         if frame.empty:
             return
         path, selected = QtWidgets.QFileDialog.getSaveFileName(
-            self, "Export dataset", "dataset.csv", "CSV (*.csv);;JSON (*.json);;Parquet (*.parquet);;Excel (*.xlsx)"
+            self,
+            "Export dataset",
+            "dataset.csv",
+            "CSV (*.csv);;JSON (*.json);;Parquet (*.parquet);;Excel (*.xlsx)",
         )
         if not path:
             return
