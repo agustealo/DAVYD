@@ -191,6 +191,44 @@ jobs:
           app.processEvents()
           assert window.current_dataset.iloc[0, 0] == "after"
 
+          visualization = window.tabs_manager.visualization_tab
+          quality_frame = pd.DataFrame(
+              {
+                  "priority": ["high", "medium", "high", "low"],
+                  "response_time": [10, 20, 30, 40],
+                  "satisfaction": [2, 3, 4, 5],
+              }
+          )
+          visualization.set_dataset(quality_frame, name="Quality Contract")
+          assert visualization.rows_card.value.text() == "4"
+          assert visualization.columns_card.value.text() == "3"
+          assert visualization.completeness_card.value.text() == "100.0%"
+          assert visualization.quality_table.rowCount() == 3
+
+          visualization.view_mode.setCurrentText("Top values")
+          visualization.x_column.setCurrentText("priority")
+          visualization._draw_chart()
+          app.processEvents()
+          assert "most common" in visualization.chart_caption.text().lower()
+
+          visualization.view_mode.setCurrentText("Distribution")
+          visualization.x_column.setCurrentText("response_time")
+          visualization._draw_chart()
+          app.processEvents()
+          assert "median" in visualization.chart_caption.text().lower()
+
+          visualization.view_mode.setCurrentText("Relationship")
+          visualization.x_column.setCurrentText("response_time")
+          visualization.y_column.setCurrentText("satisfaction")
+          visualization._draw_chart()
+          app.processEvents()
+          assert "correlation" in visualization.chart_caption.text().lower()
+
+          visualization.view_mode.setCurrentText("Missingness")
+          visualization._draw_chart()
+          app.processEvents()
+          assert "complete" in visualization.chart_caption.text().lower()
+
 
           class CooperativeWorker(QtCore.QObject):
               finished = QtCore.Signal()
