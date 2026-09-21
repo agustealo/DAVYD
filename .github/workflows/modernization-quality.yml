@@ -1,0 +1,203 @@
+name: Modernization Quality Gate
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches:
+      - modernize/**
+
+permissions:
+  contents: read
+
+jobs:
+  generation-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install generation runtime and pytest
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e .
+          python -m pip install "pytest>=8.4,<9"
+          python -m pip check
+
+      - name: Compile source tree
+        run: python -m compileall -q src
+
+      - name: Run generation contracts
+        env:
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+        run: python -m pytest tests/test_generation_contract.py -q
+
+  desktop-shell:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      QT_QPA_PLATFORM: offscreen
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install Qt system libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libegl1 \
+            libgl1 \
+            libxkbcommon-x11-0 \
+            libxcb-cursor0
+
+      - name: Install desktop runtime
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e .
+          python -m pip check
+
+      - name: Validate release metadata
+        run: |
+          test -f LICENSE
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          import openpyxl
+
+          readme = Path("README.md").read_text(encoding="utf-8").lower()
+          assert "streamlit run" not in readme
+          assert "davyd dataset studio" in readme
+          assert openpyxl.__version__
+
+          settings_example = json.loads(
+              Path("settings.example.json").read_text(encoding="utf-8")
+          )
+          serialized_settings = json.dumps(settings_example).lower()
+          assert "api_key" not in serialized_settings
+          assert "token" not in serialized_settings
+          assert "credential" not in serialized_settings
+          PY
+
+      - name: Import desktop runtime
+        run: |
+          python - <<'PY'
+          import ui_desktop
+          from ui.main_window import MainWindow
+          from ui.sidebar import Sidebar
+          from ui.tabs.dataset_editor_tab import DatasetEditorTab
+          from ui.tabs.generation_tab import GenerationTab
+          from ui.tabs.visualization_tab import VisualizationTab
+
+          assert callable(ui_desktop.main)
+          PY
+
+      - name: Offscreen desktop contracts
+        run: |
+          python - <<'PY'
+          import time
+
+          import pandas as pd
+          from PySide6 import QtCore, QtWidgets
+          from ui.main_window import MainWindow
+          from ui.menu import MenuBar
+          from ui.theme_manager import ThemeManager
+
+
+          app = QtWidgets.QApplication([])
+          app.theme_manager = ThemeManager(app)
+          app.theme_manager.apply("dark")
+          window = MainWindow()
+          window.menu_bar_instance = MenuBar(window)
+
+          assert window.tabs_manager.is_tab_loaded("editor")
+          assert window.tabs_manager.is_tab_loaded("generation")
+          assert window.tabs_manager.is_tab_loaded("visualization")
+          assert window.tabs_manager.generation_tab is not None
+          assert window.tabs_manager.visualization_tab is not None
+          assert window.sidebar.generate_btn.isEnabled()
+
+          generation = window.tabs_manager.generation_tab
+          source = pd.DataFrame({"value": ["before"]})
+          generation.display_generated_data(source)
+          window.current_dataset = source.copy()
+
+          generation.table.item(0, 0).setText("after")
+          app.processEvents()
+          assert window.current_dataset.iloc[0, 0] == "after"
+
+          generation.undo()
+          app.processEvents()
+          assert window.current_dataset.iloc[0, 0] == "before"
+
+          generation.redo()
+          app.processEvents()
+          assert window.current_dataset.iloc[0, 0] == "after"
+
+
+          class CooperativeWorker(QtCore.QObject):
+              finished = QtCore.Signal()
+
+              def __init__(self) -> None:
+                  super().__init__()
+                  self.cancelled = False
+
+              @QtCore.Slot()
+              def run(self) -> None:
+                  deadline = time.monotonic() + 5
+                  while not self.cancelled and time.monotonic() < deadline:
+                      time.sleep(0.01)
+                  self.finished.emit()
+
+              def cancel(self) -> None:
+                  self.cancelled = True
+
+
+          worker = CooperativeWorker()
+          thread = QtCore.QThread(window)
+          worker.moveToThread(thread)
+          thread.started.connect(worker.run)
+          worker.finished.connect(thread.quit)
+          thread.finished.connect(window._generation_thread_finished)
+
+          window.generation_worker = worker
+          window.generation_thread = thread
+          window.show()
+          thread.start()
+
+          start_deadline = time.monotonic() + 2
+          while not thread.isRunning() and time.monotonic() < start_deadline:
+              app.processEvents()
+              time.sleep(0.01)
+          assert thread.isRunning()
+
+          window.close()
+          app.processEvents()
+          assert worker.cancelled
+          assert window._close_requested
+          assert not window._cleanup_complete
+
+          close_deadline = time.monotonic() + 5
+          while not window._cleanup_complete and time.monotonic() < close_deadline:
+              app.processEvents()
+              time.sleep(0.01)
+
+          assert window._cleanup_complete
+          assert window.generation_thread is None
+          assert window.generation_worker is None
+          PY
