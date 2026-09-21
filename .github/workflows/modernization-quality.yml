@@ -13,7 +13,7 @@ permissions:
 jobs:
   generation-contract:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
 
     steps:
       - name: Checkout
@@ -25,28 +25,71 @@ jobs:
           python-version: "3.12"
           cache: pip
 
-      - name: Install contract-test dependencies
+      - name: Install project and test tools
         run: |
           python -m pip install --upgrade pip
-          python -m pip install \
-            "pandas==3.0.6" \
-            "PySide6==6.11.2" \
-            "httpx>=0.28,<1" \
-            "pytest>=8.4,<9"
+          python -m pip install -e ".[dev]"
 
-      - name: Compile modernization runtime
-        env:
-          PYTHONPATH: src
-        run: |
-          python -m py_compile \
-            src/config.py \
-            src/credentials.py \
-            src/dataset_generation.py \
-            src/model_providers/base.py \
-            src/model_providers/__init__.py \
-            src/model_providers_manager.py
+      - name: Compile source tree
+        run: python -m compileall -q src
 
       - name: Run generation contracts
-        env:
-          PYTHONPATH: src
         run: python -m pytest tests/test_generation_contract.py -q
+
+  desktop-shell:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      QT_QPA_PLATFORM: offscreen
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install desktop runtime
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e .
+
+      - name: Import desktop runtime
+        run: |
+          python - <<'PY'
+          import ui_desktop
+          from ui.main_window import MainWindow
+          from ui.sidebar import Sidebar
+          from ui.tabs.dataset_editor_tab import DatasetEditorTab
+          from ui.tabs.generation_tab import GenerationTab
+          from ui.tabs.visualization_tab import VisualizationTab
+          assert callable(ui_desktop.main)
+          PY
+
+      - name: Offscreen first-window smoke
+        run: |
+          python - <<'PY'
+          from PySide6 import QtWidgets
+          from ui.main_window import MainWindow
+          from ui.menu import MenuBar
+          from ui.theme_manager import ThemeManager
+
+          app = QtWidgets.QApplication([])
+          app.theme_manager = ThemeManager(app)
+          app.theme_manager.apply("dark")
+          window = MainWindow()
+          window.menu_bar_instance = MenuBar(window)
+
+          assert window.tabs_manager.is_tab_loaded("editor")
+          assert window.tabs_manager.is_tab_loaded("generation")
+          assert window.tabs_manager.is_tab_loaded("visualization")
+          assert window.tabs_manager.generation_tab is not None
+          assert window.tabs_manager.visualization_tab is not None
+          assert window.sidebar.generate_btn.isEnabled()
+
+          window.close()
+          app.processEvents()
+          PY
