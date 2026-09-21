@@ -6,6 +6,14 @@ DAVYD is a desktop AI dataset studio for designing schemas, generating synthetic
 
 The current application is a native **PySide6 desktop app**. The old browser-first launcher is no longer part of the supported runtime.
 
+## DAVYD in action
+
+![DAVYD Dataset Studio desktop overview](docs/images/app-overview.png)
+
+The screenshots in this repository are captured from the real desktop application. The populated views use a deterministic documentation fixture to exercise DAVYD's production Schema, Generate, and Data & Quality UI without embedding provider credentials or representing the fixture rows as provider-generated output.
+
+**[Open the full visual walkthrough →](docs/APP_WALKTHROUGH.md)**
+
 ## What DAVYD does
 
 DAVYD provides one end-to-end desktop workflow:
@@ -25,6 +33,8 @@ Generation is exact-row oriented: DAVYD validates model output against the schem
 
 The Schema workspace is the definition authority for generated data. It feeds the active schema into both generation and quality views.
 
+![DAVYD Schema workspace](docs/images/schema-workspace.png)
+
 ### Generate
 
 The Generate workspace provides:
@@ -35,6 +45,8 @@ The Generate workspace provides:
 - undo and redo history;
 - CSV, JSON, Parquet, and Excel export;
 - cancellation through the desktop shell.
+
+![DAVYD generation workspace streaming validated rows](docs/images/generation-live.png)
 
 `MainWindow` is the single generation orchestrator. Provider work runs on a Qt worker thread and reports only through signals. Closing DAVYD during generation requests cooperative cancellation and waits for the worker thread to finish before the application tears down its Qt objects.
 
@@ -47,6 +59,8 @@ The Data & Quality workspace provides:
 - missing-value and duplicate counts;
 - per-column type, missing, unique, and example profiling;
 - histogram, bar, and scatter charts rendered natively with Matplotlib.
+
+![DAVYD Data & Quality workspace](docs/images/data-quality.png)
 
 Edits made in Generate remain authoritative for subsequent Save operations and are refreshed into Data & Quality when that workspace is opened.
 
