@@ -1,227 +1,231 @@
-# DAVYD - AI-Powered Dataset Generator
+# DAVYD Dataset Studio
 
-![DAVYD Logo](DAVYD_SM.jpg)
+![DAVYD](DAVYD_SM.jpg)
 
-**Developer:** agustealo  
-**Website:** [agustealo.com](https://agustealo.com)  
-**Email:** [agustealo@gmail.com](mailto:agustealo@gmail.com)
+DAVYD is a desktop AI dataset studio for designing schemas, generating synthetic records with real model providers, reviewing data quality, refining generated data, and exporting production-ready datasets.
 
----
+The current application is a native **PySide6 desktop app**. The old browser-first launcher is no longer part of the supported runtime.
 
-## Table of Contents
+## What DAVYD does
 
-- [What is DAVYD?](#what-is-davyd)
-- [Key Features](#key-features)
-- [Installation](#installation)
-  - [Prerequisites](#prerequisites)
-  - [Clone the Repository](#clone-the-repository)
-  - [Install Dependencies](#install-dependencies)
-- [Getting Started](#getting-started)
-  - [Run the Application](#run-the-application)
-  - [Define Your Dataset](#define-your-dataset)
-  - [Generate and Manage Datasets](#generate-and-manage-datasets)
-- [Acronym Breakdown: DAVYD](#acronym-breakdown-davyd)
-- [Features Overview](#features-overview)
-  - [1. Streamlit UI](#1-streamlit-ui)
-  - [2. AI Model Integration](#2-ai-model-integration)
-  - [3. Data Validation](#3-data-validation)
-  - [4. Dataset Management](#4-dataset-management)
-- [Usage Examples](#usage-examples)
-- [Contribution](#contribution)
-  - [How to Contribute](#how-to-contribute)
-- [License](#license)
-- [Support](#support)
+DAVYD provides one end-to-end desktop workflow:
 
----
+1. **Schema**: define field names, types, descriptions, examples, and constraints.
+2. **Generate**: choose a provider/model, generation quality, row count, and batch size.
+3. **Stream**: watch validated rows arrive batch-by-batch while generation is running.
+4. **Refine**: edit generated cells and use undo/redo without losing the canonical dataset state.
+5. **Inspect**: search the dataset, review missing/duplicate counts, profile columns, and draw native charts.
+6. **Export**: save CSV, JSON, Parquet, or Excel output depending on the active workflow.
 
-## What is DAVYD?
+Generation is exact-row oriented: DAVYD validates model output against the schema, suppresses duplicate rows, retries invalid batches, reports progress, and supports cooperative cancellation.
 
-**DAVYD** (Dynamic AI Virtual Yielding Dataset) is an intelligent dataset generator powered by advanced AI models. It allows developers, researchers, and data scientists to generate structured datasets tailored for machine learning and AI workflows. Designed with flexibility and scalability in mind, DAVYD simplifies the process of creating realistic, high-quality datasets that adhere to specific fields and descriptions.
+## Desktop workspaces
 
----
+### Schema
 
-## Key Features
+The Schema workspace is the definition authority for generated data. It feeds the active schema into both generation and quality views.
 
-- **Customizable Dataset Structure**: Define your own fields and examples to generate structured datasets.
-- **AI-Driven Generation**: Leverages cutting-edge AI models from providers like Ollama, DeepSeek, Gemini, ChatGPT, Anthropic, Claude, Mistral, Groq, and HuggingFace.
-- **Validation & Quality Assurance**: Built-in data validation ensures all generated datasets meet specified requirements.
-- **Flexible Output Formats**: Save datasets as CSV, JSON, or Excel for seamless integration with existing workflows.
-- **User-Friendly Interface**: Streamlit-based web interface for defining, generating, and managing datasets.
-- **Dataset Management**: Archive, restore, merge, and download datasets easily.
-- **Data Quality Insights**: Visualize dataset quality metrics with modern, interactive charts.
+### Generate
 
----
+The Generate workspace provides:
 
-## Installation
+- streamed batch delivery;
+- live row and progress counters;
+- editable generated cells;
+- undo and redo history;
+- CSV, JSON, Parquet, and Excel export;
+- cancellation through the desktop shell.
 
-### Prerequisites
+`MainWindow` is the single generation orchestrator. Provider work runs on a Qt worker thread and reports only through signals. Closing DAVYD during generation requests cooperative cancellation and waits for the worker thread to finish before the application tears down its Qt objects.
 
-- **Python 3.7 or higher**
-- **pip**
-- **Git**
+### Data & Quality
 
-### Clone the Repository
+The Data & Quality workspace provides:
 
-```sh
+- dataset search;
+- row and column counts;
+- missing-value and duplicate counts;
+- per-column type, missing, unique, and example profiling;
+- histogram, bar, and scatter charts rendered natively with Matplotlib.
+
+Edits made in Generate remain authoritative for subsequent Save operations and are refreshed into Data & Quality when that workspace is opened.
+
+## Supported model providers
+
+DAVYD currently exposes these provider identifiers through the canonical provider registry:
+
+- Ollama
+- OpenAI
+- ChatGPT compatibility alias
+- DeepSeek
+- Gemini
+- Anthropic
+- Claude compatibility alias
+- Mistral
+- Groq
+- Hugging Face
+
+Model discovery and connection checks occur only after an explicit user action. DAVYD does not make provider calls simply because the application started.
+
+## Requirements
+
+- Python **3.12, 3.13, or 3.14**
+- Git for source installs
+- A supported operating system for PySide6: macOS, Windows, or Linux
+- A local Ollama installation when using Ollama, or valid credentials for hosted providers
+
+## Install from source
+
+```bash
 git clone https://github.com/agustealo/DAVYD.git
 cd DAVYD
+python -m venv .venv
 ```
 
-### Install Dependencies
+Activate the environment.
 
-Create a virtual environment and install the required libraries:
+macOS/Linux:
 
-```sh
-python -m venv env
-# Activate the virtual environment:
-# On macOS/Linux:
-source env/bin/activate
-# On Windows:
-env\Scripts\activate
-
-pip install -r requirements.txt
+```bash
+source .venv/bin/activate
 ```
 
----
+Windows PowerShell:
 
-## Getting Started
-
-### Run the Application
-
-Launch the Streamlit interface:
-
-```sh
-streamlit run src/ui.py
+```powershell
+.venv\Scripts\Activate.ps1
 ```
 
-Access the app in your browser at [http://localhost:8501](http://localhost:8501).
+Install DAVYD:
 
-### Define Your Dataset
+```bash
+python -m pip install --upgrade pip
+python -m pip install -e .
+```
 
-1. **Navigate to the "Dataset Structure" Section**:
-   - Add fields and examples manually or use a preloaded template.
-2. **Configure Generation Parameters**:
-   - Set the number of entries and select an AI provider and model.
-3. **Generate Dataset**:
-   - Click on the "✨ Generate Dataset" button to create your dataset based on the defined structure.
+Launch the desktop application:
 
-### Generate and Manage Datasets
+```bash
+davyd
+```
 
-1. **View Generated Dataset**:
-   - Once the dataset is generated, you can view and edit it in the data editor.
-2. **Manage Datasets**:
-   - **Archive**: Save the dataset to the archive directory.
-   - **Download**: Export the dataset in CSV, JSON, or Excel format.
-   - **Merge**: Combine multiple datasets into a single dataset.
-   - **Delete**: Remove datasets from the active, archive, or merged directories.
-   - **Restore**: Restore archived datasets to the active directory.
+You can also run the Python entry point directly:
 
----
+```bash
+python src/ui_desktop.py
+```
 
-## Acronym Breakdown: DAVYD
+## Credentials and provider configuration
 
-- **D**: Dynamic
-- **A**: AI
-- **V**: Virtual
-- **Y**: Yielding
-- **D**: Dataset
+DAVYD does **not** write provider credentials to its JSON settings file.
 
----
+For hosted providers, credential resolution is:
 
-## Features Overview
+1. `DAVYD_<PROVIDER>_API_KEY`, for example `DAVYD_OPENAI_API_KEY`;
+2. `DAVYD_API_KEY`;
+3. the operating-system credential vault through Python `keyring`.
 
-### 1. Streamlit UI
+A credential entered in the desktop sidebar is stored in the OS vault when secure storage is available. If the vault is unavailable, DAVYD uses the value for the current session instead of silently writing it to plaintext settings.
 
-- **Interactive Layout**: Define fields, view live previews, and generate datasets with ease.
-- **Dynamic Field Management**: Add, edit, and delete fields and examples.
-- **Data Editor**: Edit generated datasets in a user-friendly table format.
-- **Visualization**: View data quality metrics and insights with modern, interactive charts.
+For Ollama, the credential field can contain an Ollama host URL such as `http://127.0.0.1:11434`.
 
-### 2. AI Model Integration
+See [SECURITY.md](SECURITY.md) for the repository credential policy and the required response to the credential historically committed by older revisions of DAVYD.
 
-- **Multiple AI Models Support**: Integrates with various AI models via the Ollama API and other providers.
-- **Dynamic Model Fetching**: Automatically fetches and utilizes available models for data generation.
+## Application data locations
 
-### 3. Data Validation
+DAVYD keeps runtime data outside the source tree.
 
-- **Field Validation**: Ensures all required fields are present and correctly formatted.
-- **Consistency Checks**: Validates data types and value ranges to maintain dataset integrity.
-- **Detailed Logging**: Provides warnings and errors for any validation issues encountered.
+### macOS
 
-### 4. Dataset Management
+- Data: `~/Library/Application Support/DAVYD`
+- Logs: `~/Library/Logs/DAVYD`
 
-- **Archive**: Save datasets to the archive directory for long-term storage.
-- **Restore**: Restore archived datasets to the active directory.
-- **Merge**: Combine multiple datasets into a single dataset.
-- **Delete**: Remove datasets from the active, archive, or merged directories.
-- **Download**: Export datasets in CSV, JSON, or Excel format.
+### Windows
 
----
+- Data: `%LOCALAPPDATA%\DAVYD`
+- Logs: `%LOCALAPPDATA%\DAVYD\logs`
 
-## Usage Examples
+### Linux
 
-### Example 1: Generating a Sentiment Analysis Dataset
+- Data: `$XDG_DATA_HOME/davyd`, or `~/.local/share/davyd`
+- Logs: `$XDG_STATE_HOME/davyd/logs`, or `~/.local/state/davyd/logs`
 
-1. **Define Fields**: `text`, `intent`, `sentiment`, `sentiment_polarity`, `tone`, `category`, `keywords`.
-2. **Provide Examples**:
-   - `"I love this product!"`, `"affirmation"`, `"positive"`, `0.9`, `"enthusiastic"`, `"review"`, `"love, product"`
-   - `"This is disappointing."`, `"complaint"`, `"negative"`, `-0.7`, `"dissatisfied"`, `"experience"`, `"disappointment, bad"`
-3. **Generate Dataset**: Click "✨ Generate Dataset" to create 150 entries.
-4. **Export**: Save the dataset as `sentiment_analysis.csv`.
+Local settings and generated runtime data are excluded from source control.
 
-### Example 2: Creating an Intent Classification Dataset
+## Development
 
-1. **Load Template**: Select `intent_classification.json` from the template dropdown.
-2. **Review Fields and Examples**.
-3. **Generate Dataset**: Click "✨ Generate Dataset" to create 150 entries.
-4. **Validate and Export**: Ensure data quality and export as JSON.
+Install the development dependency set:
 
----
+```bash
+python -m pip install -e '.[dev]'
+```
 
-## Contribution
+Run the generation contracts:
 
-Contributions are welcome! Feel free to open an issue or submit a pull request to enhance DAVYD.
+```bash
+PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest tests/test_generation_contract.py -q
+```
 
-### How to Contribute
+Compile the source tree:
 
-1. **Fork the Repository**:
-   - Click the "Fork" button at the top right of the repository page.
-2. **Create a New Branch** for your feature or bug fix:
-   ```sh
-   git checkout -b feature-name
-   ```
-3. **Commit Your Changes**:
-   ```sh
-   git commit -m "Add a feature or fix a bug"
-   ```
-4. **Push to Your Branch**:
-   ```sh
-   git push origin feature-name
-   ```
-5. **Open a Pull Request**:
-   - Navigate to your forked repository on GitHub.
-   - Click the "Compare & pull request" button.
-   - Provide a clear description of your changes and submit the pull request.
+```bash
+python -m compileall -q src
+```
 
----
+The GitHub Actions modernization gate intentionally separates two contracts:
+
+- **generation-contract** validates the generation engine without third-party Qt pytest plugins bleeding into the environment;
+- **desktop-shell** provisions the Linux Qt runtime, imports the desktop modules, and constructs a real offscreen `MainWindow`.
+
+This split keeps generation failures distinguishable from desktop runtime failures.
+
+## Architecture
+
+The supported desktop path is intentionally small and canonical:
+
+```text
+ui_desktop.py
+    |
+    v
+MainWindow
+    |-- Sidebar
+    |-- TabsManager
+    |     |-- Schema
+    |     |-- Generate
+    |     `-- Data & Quality
+    |
+    `-- DatasetGenerationWorker
+            |
+            v
+      DatasetGenerator
+            |
+            v
+   ModelProviderRegistry
+            |
+            v
+      model_providers
+```
+
+Configuration, credential storage, generation, provider selection, dataset persistence, and UI orchestration each have one primary authority. New functionality should extend those authorities rather than creating parallel execution paths.
+
+## Repository security
+
+Do not commit:
+
+- API keys or access tokens;
+- local `settings.json` files;
+- generated datasets;
+- logs;
+- virtual environments;
+- build artifacts or caches.
+
+A credential that existed in repository history must be considered compromised until it is revoked and the affected history has been remediated. Deleting the current file is not sufficient by itself.
 
 ## License
 
-This project is licensed under the [MIT License](LICENSE). See the [LICENSE](LICENSE) file for details.
+DAVYD is released under the [MIT License](LICENSE).
 
----
+## Project
 
-## Support
-
-If you encounter any issues or have questions, feel free to contact the developer:
-
-- **Email**: [agustealo@gmail.com](mailto:agustealo@gmail.com)
-- **Website**: [agustealo.com](https://agustealo.com)
-
-![Agustealo.com](https://agustealo.com/wp-content/uploads/2024/06/agustealo-hztl-logo-BLK-w400.png)
-
----
-
-**Happy dataset generation with DAVYD! 🚀🔥**
-
----
+- Repository: https://github.com/agustealo/DAVYD
+- Developer site: https://agustealo.com
