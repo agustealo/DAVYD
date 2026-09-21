@@ -16,9 +16,7 @@ dependencies = [
   "pyarrow==25.0.1",
   "numpy>=2.2,<3",
   "psutil>=7.1.3,<8",
-  "plotly==7.1.0",
   "matplotlib>=3.10,<4",
-  "wordcloud>=1.9,<2",
   "httpx>=0.28,<1",
   "requests>=2.32,<3",
   "tenacity>=9,<10",
@@ -30,7 +28,6 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-web = ["streamlit>=1.45,<2"]
 dev = [
   "pytest>=8.4,<9",
   "pytest-qt>=4.5,<5",
@@ -39,6 +36,9 @@ dev = [
   "pip-audit>=2.9,<3",
 ]
 
+[project.scripts]
+davyd = "ui_desktop:main"
+
 [tool.setuptools]
 package-dir = {"" = "src"}
 py-modules = [
@@ -46,11 +46,14 @@ py-modules = [
   "credentials",
   "dataset_generation",
   "model_providers_manager",
+  "settings",
+  "ui_desktop",
 ]
 
 [tool.setuptools.packages.find]
 where = ["src"]
-include = ["model_providers*"]
+include = ["model_providers*", "ui*", "utils*", "autogen_client*"]
+namespaces = true
 
 [tool.ruff]
 target-version = "py312"
