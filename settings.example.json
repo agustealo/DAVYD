@@ -1,0 +1,17 @@
+{
+  "Ollama": {
+    "host": "http://127.0.0.1:11434"
+  },
+  "Gemini": {
+    "api_key": ""
+  },
+  "OpenAI": {
+    "api_key": ""
+  },
+  "Anthropic": {
+    "api_key": ""
+  },
+  "DeepSeek": {
+    "api_key": ""
+  }
+}
