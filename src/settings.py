@@ -7,10 +7,10 @@ from typing import Any, Dict
 
 from PySide6.QtCore import QSettings
 
-from config import APP_DATA_DIR
+from config import DEFAULT_PATH
 
 logger = logging.getLogger(__name__)
-SETTINGS_FILE = APP_DATA_DIR / "settings.json"
+SETTINGS_FILE = DEFAULT_PATH
 _LOCK = RLock()
 _DEFAULTS: Dict[str, Any] = {
     "model_provider": "",
