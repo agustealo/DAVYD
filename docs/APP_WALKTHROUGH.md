@@ -2,7 +2,7 @@
 
 These captures are rendered from the current PySide6 desktop application. They document the supported consumer workflow rather than a separate design mockup.
 
-The populated screenshots use a deterministic support-dataset documentation fixture to exercise DAVYD's real schema, streaming table, progress, profiling, search, and chart UI without embedding provider credentials or claiming that a hosted model produced the pictured rows.
+The populated screenshots use a deterministic support-dataset documentation fixture to exercise DAVYD's real schema, streaming table, progress, profiling, search, and insight UI without embedding provider credentials or claiming that a hosted model produced the pictured rows.
 
 ## Application overview
 
@@ -33,13 +33,23 @@ The **Generate** workspace is shown mid-run at 67% with validated rows already s
 
 For this capture, the documentation fixture is sent through `GenerationTab`'s real batch queue, flush, progress, and table-rendering methods. A normal user run reaches the same UI through `DatasetGenerationWorker` and the configured model provider.
 
-## 3. Inspect data quality and distributions
+## 3. Explore data quality and useful insights
 
 ![DAVYD Data & Quality workspace](images/data-quality.png)
 
-The **Data & Quality** workspace receives the canonical dataset and combines a searchable preview with native Matplotlib visualization and column profiling. The header summarizes row count, column count, missing values, and duplicates, while the lower quality table reports field type, missing count, unique count, and an example value.
+The redesigned **Data & Quality** workspace is built around decisions rather than raw chart mechanics. It combines a searchable row preview with four at-a-glance health cards, a guided visual explorer, plain-language chart takeaways, and a compact field-health table.
 
-The chart controls support histogram, bar, and scatter views. The capture uses a bar view of the support-dataset priority field.
+The visual explorer provides five user-facing insight modes:
+
+- **Auto insight** chooses a useful view from the selected field type;
+- **Distribution** shows numeric shape, range, and median;
+- **Top values** ranks categorical or text values with readable horizontal bars and count labels;
+- **Relationship** compares two numeric fields and reports correlation with a descriptive trend line;
+- **Missingness** surfaces incomplete fields as percentages, or explicitly confirms when the current rows are complete.
+
+The screenshot focuses on the `priority` field. Instead of a cramped generic bar chart, DAVYD ranks the values horizontally and explains the dominant value and its share below the visual. Search filters update both the row preview and the active insight so the visual always reflects the rows currently being inspected.
+
+The **Field health** section reports field kind, completeness percentage, unique-value count, and a useful typical-value or numeric-range summary. This makes sparse, overly unique, or suspicious fields easier to spot without reading a raw profiling dump.
 
 ## Supported user flow
 
@@ -61,4 +71,4 @@ Export CSV / JSON / Parquet / Excel
 
 ## Screenshot provenance
 
-The PNGs in `docs/images/` were captured from the real application at 1500 × 940 using Qt's own window capture after constructing `MainWindow`, `MenuBar`, and the production theme. The capture run also verified that every PNG was non-empty before committing it to the repository.
+The PNGs in `docs/images/` are captured from the real application at 1500 × 940 using Qt's own window capture after constructing `MainWindow`, `MenuBar`, and the production theme. The Data & Quality capture also exercises Top values, Distribution, and Missingness behavior before the image is accepted. The capture run verifies that the PNG is non-empty before committing it to the repository.
