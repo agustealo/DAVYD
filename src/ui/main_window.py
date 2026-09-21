@@ -10,7 +10,7 @@ from PySide6.QtCore import QThread, Slot
 
 from dataset_generation import DatasetGenerationWorker
 from settings import AppSettings
-from utils.main_utils import TEMP_DIR, ARCHIVE_DIR, MERGED_DIR
+from utils.main_utils import ARCHIVE_DIR, MERGED_DIR, TEMP_DIR
 from utils.manage_dataset import DatasetManager
 from .sidebar import Sidebar
 from .tabs_manager import TabsManager
@@ -27,11 +27,15 @@ class MainWindow(QtWidgets.QMainWindow):
         self.resize(1440, 900)
         self.settings = AppSettings()
         self.dataset_manager = DatasetManager(
-            temp_dir=str(TEMP_DIR), archive_dir=str(ARCHIVE_DIR), merged_dir=str(MERGED_DIR)
+            temp_dir=str(TEMP_DIR),
+            archive_dir=str(ARCHIVE_DIR),
+            merged_dir=str(MERGED_DIR),
         )
         self.current_dataset = pd.DataFrame()
         self.generation_thread: Optional[QThread] = None
         self.generation_worker: Optional[DatasetGenerationWorker] = None
+        self._close_requested = False
+        self._cleanup_complete = False
         self._build_ui()
         self._connect_signals()
         self._restore_window_state()
@@ -53,16 +57,29 @@ class MainWindow(QtWidgets.QMainWindow):
     def _connect_signals(self) -> None:
         self.sidebar.generate_clicked.connect(self._start_generation)
         self.sidebar.stop_clicked.connect(self.stop_generation)
+        self.tabs.currentChanged.connect(self._workspace_changed)
+
+        generation_tab = self.tabs_manager.generation_tab
+        if generation_tab is not None:
+            generation_tab.data_modified.connect(self._generation_data_modified)
 
     @Slot(dict)
     def _start_generation(self, config: dict) -> None:
         if self.generation_thread and self.generation_thread.isRunning():
-            QtWidgets.QMessageBox.information(self, "DAVYD", "A generation job is already running.")
+            QtWidgets.QMessageBox.information(
+                self,
+                "DAVYD",
+                "A generation job is already running.",
+            )
             return
 
         generation_tab = self.tabs_manager.generation_tab
         if generation_tab is None:
-            QtWidgets.QMessageBox.critical(self, "DAVYD", "The generation workspace is unavailable.")
+            QtWidgets.QMessageBox.critical(
+                self,
+                "DAVYD",
+                "The generation workspace is unavailable.",
+            )
             return
 
         config = dict(config)
@@ -85,8 +102,8 @@ class MainWindow(QtWidgets.QMainWindow):
         worker.error_occurred.connect(generation_tab.handle_generation_error)
         worker.error_occurred.connect(self._generation_failed)
         worker.finished.connect(thread.quit)
-        worker.finished.connect(self._generation_finished)
-        thread.finished.connect(worker.deleteLater)
+        worker.finished.connect(worker.deleteLater)
+        thread.finished.connect(self._generation_thread_finished)
         thread.finished.connect(thread.deleteLater)
 
         self.generation_thread = thread
@@ -98,20 +115,49 @@ class MainWindow(QtWidgets.QMainWindow):
         worker = self.generation_worker
         if worker is None:
             return
-        worker.cancel()
+        try:
+            worker.cancel()
+        except RuntimeError:
+            logger.debug("Generation worker was already deleted during cancellation")
         self.statusBar().showMessage("Cancelling generation…")
 
     @Slot(pd.DataFrame)
     def _generation_complete(self, dataframe: pd.DataFrame) -> None:
         self.current_dataset = dataframe.copy()
-        self.tabs_manager.present_generated_dataset(self.current_dataset, "Generated Dataset", activate=True)
+        self.tabs_manager.present_generated_dataset(
+            self.current_dataset,
+            "Generated Dataset",
+            activate=True,
+        )
         try:
             filename = self.dataset_manager.get_temp_filename("dataset")
             self.dataset_manager.save_csv_file(self.current_dataset, filename)
-            self.statusBar().showMessage(f"Generated {len(dataframe):,} rows and saved {filename}", 6000)
+            self.statusBar().showMessage(
+                f"Generated {len(dataframe):,} rows and saved {filename}",
+                6000,
+            )
         except Exception:
             logger.exception("Automatic dataset save failed")
             self.statusBar().showMessage(f"Generated {len(dataframe):,} rows", 6000)
+
+    @Slot()
+    def _generation_data_modified(self) -> None:
+        generation_tab = self.tabs_manager.generation_tab
+        if generation_tab is None:
+            return
+        self.current_dataset = generation_tab.current_dataframe().copy()
+        self.statusBar().showMessage(
+            f"Dataset edited ({len(self.current_dataset):,} rows)",
+            2500,
+        )
+
+    @Slot(int)
+    def _workspace_changed(self, index: int) -> None:
+        visualization_tab = self.tabs_manager.visualization_tab
+        if visualization_tab is None or self.current_dataset.empty:
+            return
+        if self.tabs.widget(index) is visualization_tab:
+            visualization_tab.set_dataset(self.current_dataset, name="Current Dataset")
 
     @Slot(str)
     def _generation_cancelled(self, _message: str) -> None:
@@ -123,15 +169,20 @@ class MainWindow(QtWidgets.QMainWindow):
         QtWidgets.QMessageBox.critical(self, "Generation failed", message)
 
     @Slot()
-    def _generation_finished(self) -> None:
+    def _generation_thread_finished(self) -> None:
         self.sidebar.set_generation_state(False)
         self.generation_worker = None
         self.generation_thread = None
+        if self._close_requested:
+            QtCore.QTimer.singleShot(0, self.close)
 
     @Slot()
     def open_dataset(self) -> None:
         path, _ = QtWidgets.QFileDialog.getOpenFileName(
-            self, "Open dataset", "", "Datasets (*.csv *.json *.parquet);;All files (*)"
+            self,
+            "Open dataset",
+            "",
+            "Datasets (*.csv *.json *.parquet);;All files (*)",
         )
         if not path:
             return
@@ -146,7 +197,11 @@ class MainWindow(QtWidgets.QMainWindow):
             else:
                 raise ValueError(f"Unsupported dataset format: {suffix}")
             self.current_dataset = frame
-            self.tabs_manager.present_generated_dataset(frame, Path(path).name, activate=True)
+            self.tabs_manager.present_generated_dataset(
+                frame,
+                Path(path).name,
+                activate=True,
+            )
             self.statusBar().showMessage(f"Opened {Path(path).name}", 4000)
         except Exception as exc:
             logger.exception("Open dataset failed")
@@ -155,10 +210,17 @@ class MainWindow(QtWidgets.QMainWindow):
     @Slot()
     def save_current_dataset(self) -> None:
         if self.current_dataset.empty:
-            QtWidgets.QMessageBox.information(self, "DAVYD", "There is no dataset to save.")
+            QtWidgets.QMessageBox.information(
+                self,
+                "DAVYD",
+                "There is no dataset to save.",
+            )
             return
         path, _ = QtWidgets.QFileDialog.getSaveFileName(
-            self, "Save dataset", "dataset.csv", "CSV (*.csv);;JSON (*.json);;Parquet (*.parquet)"
+            self,
+            "Save dataset",
+            "dataset.csv",
+            "CSV (*.csv);;JSON (*.json);;Parquet (*.parquet)",
         )
         if not path:
             return
@@ -202,7 +264,9 @@ class MainWindow(QtWidgets.QMainWindow):
         memory.setValue(int(self.settings.value("max_memory_mb", 1024, type=int)))
         layout.addRow("Theme", theme)
         layout.addRow("Dataset memory limit", memory)
-        buttons = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.Save | QtWidgets.QDialogButtonBox.Cancel)
+        buttons = QtWidgets.QDialogButtonBox(
+            QtWidgets.QDialogButtonBox.Save | QtWidgets.QDialogButtonBox.Cancel
+        )
         buttons.accepted.connect(dialog.accept)
         buttons.rejected.connect(dialog.reject)
         layout.addRow(buttons)
@@ -237,7 +301,9 @@ class MainWindow(QtWidgets.QMainWindow):
         QtWidgets.QMessageBox.about(
             self,
             "About DAVYD",
-            "<h3>DAVYD Dataset Studio</h3><p>Generate, inspect, refine, and export synthetic datasets with modern AI providers.</p>",
+            "<h3>DAVYD Dataset Studio</h3>"
+            "<p>Generate, inspect, refine, and export synthetic datasets "
+            "with modern AI providers.</p>",
         )
 
     def _restore_window_state(self) -> None:
@@ -251,13 +317,38 @@ class MainWindow(QtWidgets.QMainWindow):
             font.setPointSize(font_size)
             app.setFont(font)
 
+    def _finalize_shutdown(self) -> None:
+        if self._cleanup_complete:
+            return
+        self._cleanup_complete = True
+        try:
+            self.settings.set_value("window_geometry", self.saveGeometry())
+        except Exception:
+            logger.exception("Failed to save window geometry during shutdown")
+        try:
+            self.tabs_manager.cleanup()
+        except Exception:
+            logger.exception("Workspace cleanup failed during shutdown")
+        try:
+            self.dataset_manager.cleanup()
+        except Exception:
+            logger.exception("Dataset cleanup failed during shutdown")
+
     def closeEvent(self, event: QtGui.QCloseEvent) -> None:
-        if self.generation_worker is not None:
-            self.generation_worker.cancel()
-        if self.generation_thread and self.generation_thread.isRunning():
-            self.generation_thread.quit()
-            self.generation_thread.wait(2500)
-        self.settings.set_value("window_geometry", self.saveGeometry())
-        self.tabs_manager.cleanup()
-        self.dataset_manager.cleanup()
+        thread = self.generation_thread
+        if thread is not None and thread.isRunning():
+            self._close_requested = True
+            worker = self.generation_worker
+            if worker is not None:
+                try:
+                    worker.cancel()
+                except RuntimeError:
+                    logger.debug("Generation worker was already deleted during close")
+            self.statusBar().showMessage("Cancelling generation before exit…")
+            self.sidebar.setEnabled(False)
+            event.ignore()
+            return
+
+        self._finalize_shutdown()
+        event.accept()
         super().closeEvent(event)
