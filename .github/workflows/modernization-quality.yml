@@ -6,6 +6,7 @@ on:
   push:
     branches:
       - modernize/**
+      - cleanup/**
 
 permissions:
   contents: read
@@ -24,6 +25,43 @@ jobs:
         with:
           python-version: "3.12"
           cache: pip
+
+      - name: Enforce canonical source tree
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          forbidden_paths = [
+              Path("Dockerfile"),
+              Path("requirements.txt"),
+              Path("settings.json"),
+              Path("src/davyd.py"),
+              Path("src/prompt_engineering.py"),
+              Path("src/ui.py"),
+              Path("src/ui_streamlit.py"),
+              Path("src/utils/proxy_agent.py"),
+              Path("src/utils/utils.py"),
+              Path("src/autogen_client"),
+          ]
+          present = [str(path) for path in forbidden_paths if path.exists()]
+          assert not present, f"Legacy runtime artifacts reintroduced: {present}"
+
+          forbidden_source_tokens = (
+              "import streamlit",
+              "from streamlit",
+              "import autogen_client",
+              "from autogen_client",
+              "import davyd",
+              "from davyd import",
+          )
+          violations = []
+          for path in Path("src").rglob("*.py"):
+              text = path.read_text(encoding="utf-8").lower()
+              hits = [token for token in forbidden_source_tokens if token in text]
+              if hits:
+                  violations.append(f"{path}: {', '.join(hits)}")
+          assert not violations, "Legacy source dependencies found:\n" + "\n".join(violations)
+          PY
 
       - name: Install generation runtime and pytest
         run: |
