@@ -4,12 +4,34 @@ from __future__ import annotations
 
 import json
 import logging
+import os
+import sys
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
-DEFAULT_PATH = Path("settings.json")
+
+
+def _platform_paths() -> tuple[Path, Path]:
+    home = Path.home()
+    if sys.platform == "darwin":
+        data = home / "Library" / "Application Support" / "DAVYD"
+        logs = home / "Library" / "Logs" / "DAVYD"
+    elif os.name == "nt":
+        root = Path(os.environ.get("LOCALAPPDATA", home / "AppData" / "Local")) / "DAVYD"
+        data = root
+        logs = root / "logs"
+    else:
+        data_root = Path(os.environ.get("XDG_DATA_HOME", home / ".local" / "share"))
+        state_root = Path(os.environ.get("XDG_STATE_HOME", home / ".local" / "state"))
+        data = data_root / "davyd"
+        logs = state_root / "davyd" / "logs"
+    return data, logs
+
+
+APP_DATA_DIR, APP_LOG_DIR = _platform_paths()
+DEFAULT_PATH = APP_DATA_DIR / "settings.json"
 
 
 @dataclass
@@ -53,10 +75,7 @@ class Config:
         if not isinstance(data, dict):
             raise ValueError(f"Settings root in {settings_path} must be an object")
 
-        # Security invariant: credentials are transient and are never loaded from
-        # settings.json, even if an older version of DAVYD wrote one there.
         data.pop("api_key", None)
-
         public_fields = {
             name
             for name, definition in cls.__dataclass_fields__.items()
