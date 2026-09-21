@@ -1,17 +1,9 @@
 {
-  "Ollama": {
-    "host": "http://127.0.0.1:11434"
-  },
-  "Gemini": {
-    "api_key": ""
-  },
-  "OpenAI": {
-    "api_key": ""
-  },
-  "Anthropic": {
-    "api_key": ""
-  },
-  "DeepSeek": {
-    "api_key": ""
-  }
+  "model_provider": "ollama",
+  "model_name": "llama3.2:latest",
+  "num_entries": 100,
+  "quality_level": 2,
+  "schema_name": "Sentiment Analysis",
+  "theme": "dark",
+  "max_memory_mb": 1024
 }
