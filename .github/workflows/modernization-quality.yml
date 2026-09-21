@@ -25,15 +25,18 @@ jobs:
           python-version: "3.12"
           cache: pip
 
-      - name: Install project and test tools
+      - name: Install generation runtime and pytest
         run: |
           python -m pip install --upgrade pip
-          python -m pip install -e ".[dev]"
+          python -m pip install -e .
+          python -m pip install "pytest>=8.4,<9"
 
       - name: Compile source tree
         run: python -m compileall -q src
 
       - name: Run generation contracts
+        env:
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
         run: python -m pytest tests/test_generation_contract.py -q
 
   desktop-shell:
