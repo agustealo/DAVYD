@@ -54,7 +54,7 @@ py-modules = [
 
 [tool.setuptools.packages.find]
 where = ["src"]
-include = ["model_providers*", "ui*", "utils*", "autogen_client*"]
+include = ["model_providers*", "ui*", "utils*"]
 namespaces = true
 
 [tool.ruff]
