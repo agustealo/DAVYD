@@ -75,13 +75,23 @@ jobs:
         run: |
           test -f LICENSE
           python - <<'PY'
+          import json
           from pathlib import Path
+
           import openpyxl
 
           readme = Path("README.md").read_text(encoding="utf-8").lower()
           assert "streamlit run" not in readme
           assert "davyd dataset studio" in readme
           assert openpyxl.__version__
+
+          settings_example = json.loads(
+              Path("settings.example.json").read_text(encoding="utf-8")
+          )
+          serialized_settings = json.dumps(settings_example).lower()
+          assert "api_key" not in serialized_settings
+          assert "token" not in serialized_settings
+          assert "credential" not in serialized_settings
           PY
 
       - name: Import desktop runtime
