@@ -1,4 +1,43 @@
-/.env
+# Credentials / local configuration
 .env
-.env/
+.env.*
+!.env.example
+settings.json
+*.key
+*.pem
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Build / packaging
+build/
+dist/
+*.egg-info/
+
+# OS / IDE
+.DS_Store
+.idea/
+.vscode/
+
+# DAVYD runtime data
+*.log
+data_bin/temp/**
+data_bin/archive/**
+data_bin/merged_datasets/**
+!data_bin/temp/.gitkeep
+!data_bin/archive/.gitkeep
+!data_bin/merged_datasets/.gitkeep
 *.csv
+*.parquet
